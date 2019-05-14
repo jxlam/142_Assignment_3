@@ -2,13 +2,15 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-
+// ------------- E N U M S --------------
 typedef enum
 {
     READY = 0,
     KILLED = 1
 } STATUS;
 
+
+// ------------- S T R U C T S --------------
 struct command
 {
     int         command_id;
@@ -21,16 +23,22 @@ struct process
     int         process_id;
     int         virtual_addr;
     int         physical_addr;
-    int         dirty;
+    int         dirty; // should also have access bit (see if it's read but not written)
+    int         access;
     STATUS      status;
 };
 
+
+// ------------- C O M M A N D   F U N C S --------------
 void getCommandList(struct command command_list[], int *num_of_commands);
 
+
+// ------------- M E M O R Y   A L G O S --------------
 void FIFO_MEM(struct command command_list[], int *num_of_commands);
 void LRU_MEM(struct command command_list[], int *num_of_commands);
 void RANDOM_MEM(struct command command_list[], int *num_of_commands);
 
+// ------------- A C T I O N S --------------
 int executeAction(struct command command, struct process* process_list, int* physical_space, int* swap_space, int* process_index, int* swap_index, int* physical_index);
 int createProcess(struct process* process_list, int* process_index, int process_id);
 void terminateProcess();
@@ -39,6 +47,7 @@ void readProcess();
 void writeProcess();
 void freeProcess();
 
+// ------------- P R I N T   F U N C S--------------
 void printCommand(struct command Command);
 void printProcess(struct process Process);
 
@@ -47,6 +56,7 @@ int main(){
     struct command command_list[100];
     int num_of_commands;
   
+    /* populate command list and get number of commands */
     getCommandList(command_list, &num_of_commands);
 
     for(int i = 0; i < num_of_commands; i++)
@@ -54,16 +64,38 @@ int main(){
             printCommand(command_list[i]);
     }
 
-
+    /* REMEMBER TO CLEAN AFTER EACH ALGO */
     FIFO_MEM(command_list, &num_of_commands);
     LRU_MEM(command_list, &num_of_commands);
     RANDOM_MEM(command_list, &num_of_commands);
 }
 
+
+
+// FUNCTION: command command_list[]
+//     - each command is read from file "memory.dat"
+//     - values from line are stored in command struct
+//     - each command is 1 index
+//
+//     EX)         memory.dat
+//                     100 C  
+//                     100 A 1
+//
+//     RESULT)     command_list[]
+//
+//                     command_list[0]
+//                         command_id  = 100
+//                         action      = 'C'
+//                         page        = 0
+//                     command_list[1]
+//                         command_id  = 100
+//                         action      = 'A'
+//                         page        = 1
 void getCommandList(struct command command_list[], int *num_of_commands)
 {
     FILE *fp;
 
+    /* OPEN FILE TO READ COMMANDS */
     printf("Opening memory.dat file.\n");
     fp = fopen("memory.dat", "r");
     if(fp == NULL)
