@@ -33,6 +33,8 @@ struct page
     int         process_id;
     int         dirty;
     int         access;
+    int         frequency;
+    int         timer;
 };
 
 // ------------- C O M M A N D   F U N C S --------------
