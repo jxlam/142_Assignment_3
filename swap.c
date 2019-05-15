@@ -241,78 +241,7 @@ void LRU_MEM(struct command command_list[], int *num_of_commands)
 {
     printHeader("LRU_MEM");
 
-    struct process process_list[100];
-    struct page swap_space[1000];
-    struct page physical_memory[20];
 
-    int process_index = 0;
-    int physical_index = 0;
-    int swap_index = 0;
-
-    int global_timer = 0;
-    int page_to_swap = 0;
-
-    int frequency = 0;
-
-    initPageTable(physical_memory);
-    initProcessList(process_list);
-    initSwapSpace(swap_space);
-
-    for(int i=0; i < *num_of_commands; i++)
-    {
-        // Execute command command
-        printf("COMMAND #%i: ", i + 1);
-        printCommand(command_list[i]);
-
-        if(executeAction(command_list[i], process_list, physical_memory, swap_space, &process_index, &swap_index, &physical_index) == 0)
-        {
-            int oldest_timer = physical_memory[0].timer;
-            int oldest_index = 0;
-            for(int i = 0; i < 20; i++)
-            {
-                if(physical_memory[i].process_id != -1 & physical_memory[i].timer < oldest_timer)
-                {
-                    oldest_timer = physical_memory[i].timer;
-                    oldest_index = i;
-                }
-            }
-            movePageIntoSwap(oldest_index, swap_space, process_list, physical_memory);
-            printPhysicalSpace(physical_memory);
-            printSwapSpace(swap_space);
-            printProcessList(process_list);
-
-            executeAction(command_list[i], process_list, physical_memory, swap_space, &process_index, &swap_index, &physical_index);
-            printPhysicalSpace(physical_memory);
-            printSwapSpace(swap_space);
-            printProcessList(process_list);
-        }
-
-        if(command_list[i].action == 'C')
-        {
-            for(int k = 0; k < 100; k++)
-            {
-                if(process_list[k].process_id == command_list[i].command_id)
-                {
-                    for(int j = 0; j < 20; j++)
-                    {
-                        if(process_list[k].page_table[j].virtual_addr == command_list[i].page)
-                        {
-                            int index = process_list[k].page_table[j].physical_addr;
-                            physical_memory[index].frequency = 0;
-                        }
-                    }
-                }
-            }
-
-            printProcessList(process_list);
-        }
-    }
-
-    printf("\n\nFINAL PROCESS LIST\n");
-    printProcessList(process_list);
-
-    printf("\n\nFINAL PHYSICAL PAGE\n");
-    printPhysicalSpace(physical_memory);
 }
 
 void RANDOM_MEM(struct command command_list[], int *num_of_commands)
