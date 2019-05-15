@@ -16,8 +16,8 @@ int main(){
     }
 
     /* REMEMBER TO CLEAN AFTER EACH ALGO */
-    FIFO_MEM(command_list, &num_of_commands);
-    LRU_MEM(command_list, &num_of_commands);
+    // FIFO_MEM(command_list, &num_of_commands);
+    // LRU_MEM(command_list, &num_of_commands);
     RANDOM_MEM(command_list, &num_of_commands);
 }
 
@@ -90,6 +90,17 @@ void initPageTable(struct page pages[])
     }
 }
 
+void initSwapSpace(struct page pages[])
+{
+    for(int i = 0; i < 1000; i++)
+    {
+        pages[i].process_id = -1;
+        int dirty = 0;
+        int access = 0;
+    }
+}
+
+
 void initProcessList(struct process Process[])
 {
     for(int i = 0; i < 100; i++)
@@ -105,6 +116,44 @@ void initProcessList(struct process Process[])
     }
 }
 
+void movePageIntoSwap(int swap_index, struct page swap_space[], struct process Process[], struct page physical_space[])
+{
+    printf("MOVING %i INTO SWAP.\n", swap_index);
+    struct page pageToSwap;
+    int new_swap_index;
+
+    pageToSwap = physical_space[swap_index];
+
+    for(int i = 0; i < 1000; i++)
+    {
+        if(swap_space[i].process_id == -1)
+        {
+            swap_space[i] = pageToSwap;
+            new_swap_index = i;
+            break;
+        }
+    }
+
+    for(int i = 0; i < 100; i++)
+    {
+        if(physical_space[swap_index].process_id == Process[i].process_id)
+        {
+            for(int j = 0; j < 20; j++)
+            {
+                if(swap_index == Process[i].page_table[j].physical_addr)
+                {
+                    Process[i].page_table[j].swap_index = new_swap_index;
+                }
+            }
+        }
+    }
+
+    //freePage(&(physical_space[swap_index]));
+    physical_space[swap_index].process_id = -1;
+    physical_space[swap_index].dirty = 0;
+    physical_space[swap_index].access = 0;
+}
+
 
 
 
@@ -115,7 +164,7 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
     printHeader("FIFO_MEM");
 
     struct process process_list[100];
-    int swap_space[1000];
+    struct page swap_space[1000];
     struct page physical_memory[20];
 
     int process_index = 0;
@@ -154,6 +203,33 @@ void RANDOM_MEM(struct command command_list[], int *num_of_commands)
 {
     printHeader("RANDOM_MEM");
 
+    struct process process_list[100];
+    struct page swap_space[1000];
+    struct page physical_memory[20];
+
+    int process_index = 0;
+    int physical_index = 0;
+    int swap_index = 0;
+
+    initPageTable(physical_memory);
+    initProcessList(process_list);
+    initSwapSpace(swap_space);
+
+    for(int i=0; i < *num_of_commands; i++)
+    {
+        // Execute command command
+        printf("COMMAND #%i: ", i + 1);
+        printCommand(command_list[i]);
+
+        if(executeAction(command_list[i], process_list, physical_memory, swap_space, &process_index, &swap_index, &physical_index) == 0)
+        {
+            printf("SWAP: %i\n", rand() % 20);
+            movePageIntoSwap(rand() % 20, swap_space, process_list, physical_memory);
+            printPhysicalSpace(physical_memory);
+            printSwapSpace(swap_space);
+            printProcessList(process_list);
+        }
+    }
 }
 
 
@@ -162,7 +238,7 @@ void RANDOM_MEM(struct command command_list[], int *num_of_commands)
 
 // ------------- A C T I O N S --------------
 
-int executeAction(struct command command, struct process process_list[], struct page physical_space[], int swap_space[], int* process_index, int* swap_index, int* physical_index)
+int executeAction(struct command command, struct process process_list[], struct page physical_space[], struct page swap_space[], int* process_index, int* swap_index, int* physical_index)
 {
     int result = 1;
     switch(command.action)
@@ -210,6 +286,7 @@ int createProcess(struct process process_list[], int* process_index, int process
     {
         createdProcess.page_table[i].virtual_addr   = -1;
         createdProcess.page_table[i].physical_addr  = -1;
+        createdProcess.page_table[i].swap_index     = -1;
     }
 
     process_list[(*process_index)++] = createdProcess;
@@ -388,7 +465,12 @@ void printPhysicalSpace(struct page memory_space[])
     {
         if(memory_space[i].process_id != -1)
         {
+            printf("%i. ", i);
             printPage(memory_space[i]);
+        }
+        else
+        {
+            printf("INDEX %i IS FREE\n", i);
         }
     }
     printf("\n");
@@ -405,6 +487,18 @@ void printProcessPageTable(struct address virtual_memory[])
         }
     }
     printf("\n");
+}
+
+void printSwapSpace(struct page swap_space[])
+{
+    printf("\nSwap Space\n");
+    for(int i = 0; i < 1000; i++)
+    {
+        if(swap_space[i].process_id != -1)
+        {
+            printPage(swap_space[i]);
+        }
+    }
 }
 
 void printHeader(char *message)
