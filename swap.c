@@ -116,14 +116,13 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
 
     struct process process_list[100];
     int swap_space[1000];
-    struct page page_list[20];
-    
-    initPageTable(page_list);
+    struct page physical_memory[20];
 
     int process_index = 0;
     int physical_index = 0;
     int swap_index = 0;
 
+    initPageTable(physical_memory);
     initProcessList(process_list);
 
     for(int i=0; i < *num_of_commands; i++)
@@ -132,9 +131,9 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
         printf("COMMAND #%i: ", i + 1);
         printCommand(command_list[i]);
 
-        if(executeAction(command_list[i], process_list, page_list, swap_space, &process_index, &swap_index, &physical_index) == 0)
+        if(executeAction(command_list[i], process_list, physical_memory, swap_space, &process_index, &swap_index, &physical_index) == 0)
         {
-            printf("COMMAND FAILED\n");
+            printf("SWAP\n");
         }
     }
 
@@ -142,7 +141,7 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
     printProcessList(process_list);
 
     printf("\n\nFINAL PHYSICAL PAGE\n");
-    printPhysicalSpace(page_list);
+    printPhysicalSpace(physical_memory);
 }
 
 void LRU_MEM(struct command command_list[], int *num_of_commands)
@@ -178,7 +177,7 @@ int executeAction(struct command command, struct process process_list[], struct 
             printPhysicalSpace(physical_space);
             break;
         case 'A':   
-            allocateProcess(command, process_list, physical_space);
+            result = allocateProcess(command, process_list, physical_space);
             printPhysicalSpace(physical_space);
             printProcessList(process_list);
             break;
@@ -217,6 +216,7 @@ int createProcess(struct process process_list[], int* process_index, int process
 
     return 1;
 }
+
 void terminateProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
     printf("TERMINATE PROCESS\n");
@@ -229,8 +229,10 @@ void terminateProcess(struct command command, struct process process_list[], str
         }
     }
 }
-void allocateProcess(struct command command, struct process process_list[], struct page physical_space[])
+
+int allocateProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
+    int result = 1;
     int physical_index = -1;
     printf("ALLOCATE PROCESS\n");
     for(int i = 0; i < 20; i++)
@@ -265,8 +267,9 @@ void allocateProcess(struct command command, struct process process_list[], stru
     }
     else
     {
-        // SWAP ALGO?
+        result = 0;
     }
+    return result;
 }
 void readProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
@@ -292,6 +295,7 @@ void writeProcess(struct command command, struct process process_list[], struct 
 {
     int physical_index;
     printf("WRITE PROCESS\n");
+
     for(int i = 0; i < 100; i++)
     {
         if(process_list[i].process_id == command.command_id)

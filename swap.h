@@ -51,7 +51,7 @@ void RANDOM_MEM(struct command command_list[], int *num_of_commands);
 int executeAction(struct command command, struct process process_list[], struct page physical_space[], int swap_space[], int* process_index, int* swap_index, int* physical_index);
 int createProcess(struct process process_list[], int* process_index, int process_id);
 void terminateProcess(struct command command, struct process process_list[], struct page physical_space[]);
-void allocateProcess(struct command command, struct process process_list[], struct page physical_space[]);
+int allocateProcess(struct command command, struct process process_list[], struct page physical_space[]);
 void readProcess(struct command command, struct process process_list[], struct page physical_space[]);
 void writeProcess(struct command command, struct process process_list[], struct page physical_space[]);
 void freeProcess(struct command command, struct process process_list[], struct page physical_space[]);
