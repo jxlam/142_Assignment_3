@@ -1,68 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-// ------------- E N U M S --------------
-typedef enum
-{
-    READY = 0,
-    KILLED = 1
-} STATUS;
-
-
-// ------------- S T R U C T S --------------
-struct command
-{
-    int         command_id;
-    char        action;
-    int         page;
-};
-
-struct process
-{
-    int         process_id;
-    int         virtual_addr;
-    int         physical_addr;
-    STATUS      status;
-};
-
-struct page
-{
-    int         process_id;
-    int         dirty;
-    int         access;
-};
-
-// ------------- C O M M A N D   F U N C S --------------
-void getCommandList(struct command command_list[], int *num_of_commands);
-void initPageTable(stuct page pages[]);
-
-
-// ------------- M E M O R Y   A L G O S --------------
-void FIFO_MEM(struct command command_list[], int *num_of_commands);
-void LRU_MEM(struct command command_list[], int *num_of_commands);
-void RANDOM_MEM(struct command command_list[], int *num_of_commands);
-
-// ------------- A C T I O N S --------------
-int executeAction(struct command command, struct process* process_list, int* physical_space, int* swap_space, int* process_index, int* swap_index, int* physical_index);
-int createProcess(struct process* process_list, int* process_index, int process_id);
-void terminateProcess();
-void allocateProcess();
-void readProcess();
-void writeProcess();
-void freeProcess();
-
-// ------------- P R I N T   F U N C S--------------
-void printCommand(struct command Command);
-void printProcess(struct process Process);
-void printHeader(char *message);
-
+#include "swap.h"
 
 int main(){
     struct command command_list[100];
     int num_of_commands;
-
-    struct page page_list[20];
   
     /* populate command list and get number of commands */
     getCommandList(command_list, &num_of_commands);
@@ -137,7 +80,7 @@ void getCommandList(struct command command_list[], int *num_of_commands)
 }
 
 
-void initPageTable(stuct page pages[])
+void initPageTable(struct page pages[])
 {
     for(int i = 0; i < 20; i++)
     {
@@ -147,18 +90,41 @@ void initPageTable(stuct page pages[])
     }
 }
 
+void initProcessList(struct process Process[])
+{
+    for(int i = 0; i < 100; i++)
+    {
+        Process[i].process_id       = -1;
+        Process[i].status           = READY;
+
+        for(int j = 0; j < 20; j++)
+        {
+            Process[i].page_table[j].virtual_addr     = -1;
+            Process[i].page_table[j].physical_addr    = -1;
+        }
+    }
+}
+
+
+
+
+// ------------- M E M O R Y / S W A P   A L G O S --------------
 
 void FIFO_MEM(struct command command_list[], int *num_of_commands)
 {
     printHeader("FIFO_MEM");
 
     struct process process_list[100];
-    int physical_space[20];
     int swap_space[1000];
+    struct page page_list[20];
+    
+    initPageTable(page_list);
 
     int process_index = 0;
     int physical_index = 0;
     int swap_index = 0;
+
+    initProcessList(process_list);
 
     for(int i=0; i < *num_of_commands; i++)
     {
@@ -166,11 +132,17 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
         printf("COMMAND #%i: ", i + 1);
         printCommand(command_list[i]);
 
-        if(executeAction(command_list[i], process_list, physical_space, swap_space, &process_index, &swap_index, &physical_index) == 0)
+        if(executeAction(command_list[i], process_list, page_list, swap_space, &process_index, &swap_index, &physical_index) == 0)
         {
             printf("COMMAND FAILED\n");
         }
     }
+
+    printf("\n\nFINAL PROCESS LIST\n");
+    printProcessList(process_list);
+
+    printf("\n\nFINAL PHYSICAL PAGE\n");
+    printPhysicalSpace(page_list);
 }
 
 void LRU_MEM(struct command command_list[], int *num_of_commands)
@@ -185,73 +157,192 @@ void RANDOM_MEM(struct command command_list[], int *num_of_commands)
 
 }
 
-int executeAction(struct command command, struct process* process_list, int* physical_space, int* swap_space, int* process_index, int* swap_index, int* physical_index)
+
+
+
+
+// ------------- A C T I O N S --------------
+
+int executeAction(struct command command, struct process process_list[], struct page physical_space[], int swap_space[], int* process_index, int* swap_index, int* physical_index)
 {
     int result = 1;
     switch(command.action)
     {
         case 'C':   
             createProcess(process_list, process_index, command.command_id);
-            printProcess(process_list[(*process_index) - 1]);
+            // printProcess(process_list[(*process_index) - 1]);
+            printProcessList(process_list);
             break;
         case 'T':   
-            terminateProcess();
+            terminateProcess(command, process_list, physical_space);
+            printPhysicalSpace(physical_space);
             break;
         case 'A':   
-            allocateProcess();
+            allocateProcess(command, process_list, physical_space);
+            printPhysicalSpace(physical_space);
+            printProcessList(process_list);
             break;
         case 'R':   
-            readProcess();
+            readProcess(command, process_list, physical_space);
+            printPhysicalSpace(physical_space);
             break;
         case 'W':   
-            writeProcess();
+            writeProcess(command, process_list, physical_space);
+            printPhysicalSpace(physical_space);
             break;
         case 'F':   
-            freeProcess();
+            freeProcess(command, process_list, physical_space);
             break;
         default:    
             result = 0;
             break;
     }
+    return result;
 }
 
-int createProcess(struct process* process_list, int* process_index, int process_id)
+int createProcess(struct process process_list[], int* process_index, int process_id)
 {
-    printf("createProcess\n");
+    printf("CREATE PROCESS\n");
     struct process createdProcess;
 
     createdProcess.process_id       = process_id;
-    createdProcess.virtual_addr     = -1;
-    createdProcess.physical_addr    = -1;
-    createdProcess.dirty            = 0;
     createdProcess.status           = READY;
-
-    printProcess(createdProcess);
+    for(int i = 0; i < 20; i++)                         // Initializes page table
+    {
+        createdProcess.page_table[i].virtual_addr   = -1;
+        createdProcess.page_table[i].physical_addr  = -1;
+    }
 
     process_list[(*process_index)++] = createdProcess;
 
     return 1;
 }
-void terminateProcess()
+void terminateProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
-    printf("terminateProcess\n");
+    printf("TERMINATE PROCESS\n");
+    freeProcess(command, process_list, physical_space);
+    for(int i = 0; i < 100; i++)
+    {
+        if(process_list[i].process_id == command.command_id)
+        {
+            process_list[i].status = KILLED;
+        }
+    }
 }
-void allocateProcess()
+void allocateProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
-    printf("allocateProcess\n");
+    int physical_index = -1;
+    printf("ALLOCATE PROCESS\n");
+    for(int i = 0; i < 20; i++)
+    {
+        if(physical_space[i].process_id == -1)
+        {
+            physical_index = i;
+            physical_space[i].process_id = command.command_id;
+            break;
+        }
+    }
+
+    if(physical_index >= 0)
+    {
+        for(int i = 0; i < 100; i++)
+        {
+            if(command.command_id == process_list[i].process_id)
+            {
+                for(int j = 0; j < 20; j++)
+                {
+                    if(process_list[i].page_table[j].virtual_addr == -1)
+                    {
+                        // printf("storing VA and PA: process %i, page_table %i, VA %i, PA %i\n", 
+                        //         process_list[i].process_id, j, command.page, physical_index);
+                        process_list[i].page_table[j].virtual_addr  = command.page;
+                        process_list[i].page_table[j].physical_addr = physical_index;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        // SWAP ALGO?
+    }
 }
-void readProcess()
+void readProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
-    printf("readProcess\n");
+    int physical_index;
+    printf("READ PROCESS\n");
+    for(int i = 0; i < 100; i++)
+    {
+        if(process_list[i].process_id == command.command_id)
+        {
+            for(int j = 0; j < 20; j++)
+            {
+                if(process_list[i].page_table[j].virtual_addr == command.page)
+                {
+                    physical_index = process_list[i].page_table[j].physical_addr;
+                    physical_space[physical_index].access = 1;
+                }
+            }
+        }
+    }
 }
-void writeProcess()
+
+void writeProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
-    printf("writeProcess\n");
+    int physical_index;
+    printf("WRITE PROCESS\n");
+    for(int i = 0; i < 100; i++)
+    {
+        if(process_list[i].process_id == command.command_id)
+        {
+            for(int j = 0; j < 20; j++)
+            {
+                if(process_list[i].page_table[j].virtual_addr == command.page)
+                {
+                    physical_index = process_list[i].page_table[j].physical_addr;
+                    physical_space[physical_index].dirty = 1;
+                }
+            }
+        }
+    }
 }
-void freeProcess()
+void freeProcess(struct command command, struct process process_list[], struct page physical_space[])
 {
-    printf("freeProcess\n");
+    int physical_index;
+    printf("FREE PROCESS\n");
+    for(int i = 0; i < 100; i++)
+    {
+        if(process_list[i].process_id == command.command_id)
+        {
+            for(int j = 0; j < 20; j++)
+            {
+                if(process_list[i].page_table[j].virtual_addr != -1)
+                {
+                    physical_index = process_list[i].page_table[j].physical_addr;
+                    freePage(&physical_space[physical_index]);           // frees physical page
+                    process_list[i].page_table[j].virtual_addr  = -1;       // clears process page table
+                    process_list[i].page_table[j].physical_addr = -1;
+                }
+            }
+        }
+    }
 }
+
+
+void freePage(struct page* Page)
+{
+    (*Page).process_id     = -1;
+    (*Page).dirty          = 0;
+    (*Page).access         = 0;
+}
+
+
+
+
+
+// ------------- P R I N T S --------------
+
 
 void printCommand(struct command Command)
 {
@@ -261,8 +352,55 @@ void printCommand(struct command Command)
 
 void printProcess(struct process Process)
 {
-    printf("process_id: %i virtual_addr: %i physical_addr: %i dirty: %i status: %i\n", 
-              Process.process_id, Process.virtual_addr, Process.physical_addr, Process.dirty, Process.status);
+    printf("process_id: %i status: %i\n", 
+              Process.process_id, Process.status);
+
+    printProcessPageTable(Process.page_table);
+}
+
+void printPage(struct page Page)
+{
+    printf("process_id: %i dirty: %i access: %i \n", 
+              Page.process_id, Page.dirty, Page.access);
+}
+
+void printProcessList(struct process Process[])
+{
+    printf("\nProcess List\n");
+    for(int i = 0; i < 100; i++)
+    {
+        if(Process[i].process_id != -1)
+        {
+            printProcess(Process[i]);
+        }
+    }
+    printf("\n");
+}
+
+void printPhysicalSpace(struct page memory_space[])
+{
+    printf("\nPhysical Space\n");
+    for(int i = 0; i < 20; i++)
+    {
+        if(memory_space[i].process_id != -1)
+        {
+            printPage(memory_space[i]);
+        }
+    }
+    printf("\n");
+}
+
+void printProcessPageTable(struct address virtual_memory[])
+{
+    for(int i = 0; i < 20; i++)
+    {
+        if(virtual_memory[i].virtual_addr != -1)
+        {
+            printf("virtual_addr: %i physical_addr: %i\n", 
+                    virtual_memory[i].virtual_addr, virtual_memory[i].physical_addr);
+        }
+    }
+    printf("\n");
 }
 
 void printHeader(char *message)
