@@ -23,14 +23,19 @@ struct process
     int         process_id;
     int         virtual_addr;
     int         physical_addr;
-    int         dirty; // should also have access bit (see if it's read but not written)
-    int         access;
     STATUS      status;
 };
 
+struct page
+{
+    int         process_id;
+    int         dirty;
+    int         access;
+};
 
 // ------------- C O M M A N D   F U N C S --------------
 void getCommandList(struct command command_list[], int *num_of_commands);
+void initPageTable(stuct page pages[]);
 
 
 // ------------- M E M O R Y   A L G O S --------------
@@ -50,11 +55,14 @@ void freeProcess();
 // ------------- P R I N T   F U N C S--------------
 void printCommand(struct command Command);
 void printProcess(struct process Process);
+void printHeader(char *message);
 
 
 int main(){
     struct command command_list[100];
     int num_of_commands;
+
+    struct page page_list[20];
   
     /* populate command list and get number of commands */
     getCommandList(command_list, &num_of_commands);
@@ -128,10 +136,21 @@ void getCommandList(struct command command_list[], int *num_of_commands)
     *num_of_commands = index;
 }
 
+
+void initPageTable(stuct page pages[])
+{
+    for(int i = 0; i < 20; i++)
+    {
+        pages[i].process_id = -1;
+        int dirty = 0;
+        int access = 0;
+    }
+}
+
+
 void FIFO_MEM(struct command command_list[], int *num_of_commands)
 {
-    printf("\n\t\t\t\tFIFO MEM\n");
-    printf("-----------------------------------------------------------------------------------\n");
+    printHeader("FIFO_MEM");
 
     struct process process_list[100];
     int physical_space[20];
@@ -156,15 +175,13 @@ void FIFO_MEM(struct command command_list[], int *num_of_commands)
 
 void LRU_MEM(struct command command_list[], int *num_of_commands)
 {
-    printf("\n\t\t\t\tLRU MEM\n");
-    printf("-----------------------------------------------------------------------------------\n");
+    printHeader("LRU_MEM");
 
 }
 
 void RANDOM_MEM(struct command command_list[], int *num_of_commands)
 {
-    printf("\n\t\t\t\tRANDOM MEM\n");
-    printf("-----------------------------------------------------------------------------------\n");
+    printHeader("RANDOM_MEM");
 
 }
 
@@ -246,4 +263,10 @@ void printProcess(struct process Process)
 {
     printf("process_id: %i virtual_addr: %i physical_addr: %i dirty: %i status: %i\n", 
               Process.process_id, Process.virtual_addr, Process.physical_addr, Process.dirty, Process.status);
+}
+
+void printHeader(char *message)
+{
+    printf("\n\t\t\t\t%s\n", message);
+    printf("-----------------------------------------------------------------------------------\n");
 }
